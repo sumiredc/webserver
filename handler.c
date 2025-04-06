@@ -83,35 +83,29 @@ void handle_client(int client_fd)
     if (strncmp(buffer, "GET ", 4) == 0)
     {
         html_response(client_fd, buffer);
-        close(client_fd);
         return;
     }
     else if (strncmp(buffer, "POST ", 5) == 0)
     {
         write(client_fd, created, strlen(created));
-        close(client_fd);
         return;
     }
     else if (strncmp(buffer, "PUT ", 4) == 0)
     {
         write(client_fd, ok, strlen(ok));
-        close(client_fd);
         return;
     }
     else if (strncmp(buffer, "PATCH ", 6) == 0)
     {
         write(client_fd, ok, strlen(ok));
-        close(client_fd);
         return;
     }
     else if (strncmp(buffer, "DELETE ", 7) == 0)
     {
         write(client_fd, no_content, strlen(no_content));
-        close(client_fd);
         return;
     }
 
     write(client_fd, bad_request, strlen(bad_request));
-    close(client_fd);
     return;
 }

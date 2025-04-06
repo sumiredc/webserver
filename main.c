@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
@@ -12,6 +13,8 @@
 
 int main()
 {
+    signal(SIGCHLD, SIG_IGN); // 子プロセスの終了を無視して自動的に解放
+
     int server_fd, client_fd;
     struct sockaddr_in addr;          // IPv4 用のソケットアドレス構造体を宣言
     socklen_t addrlen = sizeof(addr); // アドレス情報取得時に渡す際に必要なサイズを事前に取得
@@ -37,9 +40,35 @@ int main()
         // → クライアントが接続すると、新しいソケットを作成してファイルディスクリプタを返却する
         client_fd = accept(server_fd, (struct sockaddr *)&addr, &addrlen);
 
-        if (client_fd >= 0)
+        if (client_fd < 0)
         {
+            continue;
+        }
+
+        // マルチプロセス対応
+        pid_t pid = fork();
+        if (pid == 0)
+        {
+            // 子プロセス
+
+            // fork すると FD を共有するので、不要な接続は閉じる
+            // 子プロセスではクライアントとの通信に専念するため不要
+            // プロセスが開いたままだと、子が終了するまで完全に閉じられない可能性がある
+            // もし親が server_fd を close しても、子が持っているとカーネルに「まだ使用中」とみなされる
+            close(server_fd);
+
             handle_client(client_fd);
+            close(client_fd);
+            exit(0);
+        }
+        else if (pid > 0)
+        {
+            // 親プロセス
+            close(client_fd);
+        }
+        else
+        {
+            perror("fork failed");
         }
     }
 
