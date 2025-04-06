@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGG = -Wall
 TARGET = server
-OBJS = main.o handler.o utils.o
+OBJS = handler.o logger.o main.o utils.o
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGG) -o $@ $^

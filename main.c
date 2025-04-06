@@ -57,7 +57,7 @@ int main()
             // もし親が server_fd を close しても、子が持っているとカーネルに「まだ使用中」とみなされる
             close(server_fd);
 
-            handle_client(client_fd);
+            handle_client(client_fd, &addr);
             close(client_fd);
             exit(0);
         }

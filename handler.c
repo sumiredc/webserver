@@ -4,8 +4,7 @@
 #include <unistd.h>
 #include "handler.h"
 #include "utils.h"
-
-#define BUF_SIZE 8192
+#include "logger.h"
 
 void html_response(int client_fd, char *buffer)
 {
@@ -70,42 +69,55 @@ void html_response(int client_fd, char *buffer)
     fclose(fp); // ファイルを閉じる
 }
 
-void handle_client(int client_fd)
+void handle_client(int client_fd, struct sockaddr_in *addr)
 {
     const char *ok = "HTTP/1.1 200 OK\r\n\r\n";
     const char *created = "HTTP/1.1 201 Created\r\n\r\n";
     const char *no_content = "HTTP/1.1 204 No Content\r\n\r\n";
     const char *bad_request = "HTTP/1.1 400 Bad Request\r\n\r\n";
 
-    char buffer[BUF_SIZE];
-    read(client_fd, buffer, BUF_SIZE - 1);
+    char buffer[8192];
+    int n = read(client_fd, buffer, sizeof(buffer) - 1);
+    if (n > 0)
+    {
+        buffer[n] = '\0';                            // 文字列として扱えるように終端を追加
+        char *request_line = strtok(buffer, "\r\n"); // 最初の行を取得する
+
+        write_access_log(addr, request_line);
+    }
+    else if (n == 0)
+    {
+        printf("client closed the connection.\n");
+        return;
+    }
+    else
+    {
+        perror("read");
+        return;
+    }
 
     if (strncmp(buffer, "GET ", 4) == 0)
     {
-        html_response(client_fd, buffer);
-        return;
+        html_response(client_fd, buffer); // 該当する HTML ファイルを返却する
     }
     else if (strncmp(buffer, "POST ", 5) == 0)
     {
         write(client_fd, created, strlen(created));
-        return;
     }
     else if (strncmp(buffer, "PUT ", 4) == 0)
     {
         write(client_fd, ok, strlen(ok));
-        return;
     }
     else if (strncmp(buffer, "PATCH ", 6) == 0)
     {
         write(client_fd, ok, strlen(ok));
-        return;
     }
     else if (strncmp(buffer, "DELETE ", 7) == 0)
     {
         write(client_fd, no_content, strlen(no_content));
-        return;
     }
-
-    write(client_fd, bad_request, strlen(bad_request));
-    return;
+    else
+    {
+        write(client_fd, bad_request, strlen(bad_request));
+    }
 }
