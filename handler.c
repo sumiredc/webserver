@@ -29,6 +29,7 @@ void html_response(int client_fd, char *buffer)
     FILE *fp = fopen(filepath, "rb"); // パスに該当するファイルの存在確認
     if (fp == NULL)
     {
+        // 該当ファイルが見つからないので Not Found をセットする
         strcpy(filepath, "./html/errors/not-found.html");
         fp = fopen(filepath, "rb");
 
@@ -41,12 +42,13 @@ void html_response(int client_fd, char *buffer)
         strcpy(message, "OK");
     }
 
-    char *content_type = get_content_type(filepath);
+    char *content_type = get_content_type(filepath); // Content-Type の値を取得
 
-    fseek(fp, 0, SEEK_END);
-    filesize = ftell(fp);
-    rewind(fp);
+    fseek(fp, 0, SEEK_END); // ファイルの末尾へ移動
+    filesize = ftell(fp);   // 現在位置を取得 = ファイルサイズ
+    rewind(fp);             // ファイルの先頭へ移動
 
+    // Header を生成
     snprintf(header, sizeof(header),
              "HTTP/1.1 %d %s\r\n"
              "Content-Length: %ld\r\n"
@@ -54,17 +56,18 @@ void html_response(int client_fd, char *buffer)
              "\r\n",
              status, message, filesize, content_type);
 
-    write(client_fd, header, strlen(header));
+    write(client_fd, header, strlen(header)); // Header を書き込み
 
     char filebuf[1024];
     size_t n;
+
+    // ファイルを読み込みながら書き込み
     while ((n = fread(filebuf, 1, sizeof(filebuf), fp)) > 0)
     {
         write(client_fd, filebuf, n);
     }
 
-    fclose(fp);
-    close(client_fd);
+    fclose(fp); // ファイルを閉じる
 }
 
 void handle_client(int client_fd)
