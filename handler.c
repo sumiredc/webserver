@@ -6,13 +6,18 @@
 #include "utils.h"
 #include "logger.h"
 
-void html_response(int client_fd, char *buffer)
-{
-    char method[8], path[256];
-    sscanf(buffer, "%s %s", method, path); // buffuer から method と path を取得
+#define ROOT_DIR "./html/public"
 
+// ディレクトリトラバーサル攻撃への対応
+int is_safe_path(const char *path)
+{
+    return strstr(path, "..") == NULL;
+}
+
+void html_response(int client_fd, char *path)
+{
     char filepath[512];
-    snprintf(filepath, sizeof(filepath), "./html/public%s", path); // path に該当する filepath に置き換え
+    snprintf(filepath, sizeof(filepath), "%s%s", ROOT_DIR, path); // path に該当する filepath に置き換え
 
     // 末尾がスラッシュの場合、/index.html を探す
     if (path[strlen(path) - 1] == '/')
@@ -24,21 +29,32 @@ void html_response(int client_fd, char *buffer)
     char message[256];
     long filesize;
     char header[512];
+    FILE *fp;
 
-    FILE *fp = fopen(filepath, "rb"); // パスに該当するファイルの存在確認
-    if (fp == NULL)
+    if (is_safe_path(path))
     {
-        // 該当ファイルが見つからないので Not Found をセットする
-        strcpy(filepath, "./html/errors/not-found.html");
-        fp = fopen(filepath, "rb");
+        fp = fopen(filepath, "rb"); // パスに該当するファイルの存在確認
+        if (fp == NULL)
+        {
+            // 該当ファイルが見つからないので Not Found をセットする
+            strcpy(filepath, "./html/errors/not-found.html");
+            fp = fopen(filepath, "rb");
 
-        status = 404;
-        strcpy(message, "Not Found");
+            status = 404;
+            strcpy(message, "Not Found");
+        }
+        else
+        {
+            status = 200;
+            strcpy(message, "OK");
+        }
     }
     else
     {
-        status = 200;
-        strcpy(message, "OK");
+        // 不正な URL
+        fp = fopen("./html/errors/forbidden.html", "rb"); // パスに該当するファイルの存在確認
+        status = 403;
+        strcpy(message, "Forbidden");
     }
 
     char *content_type = get_content_type(filepath); // Content-Type の値を取得
@@ -96,23 +112,26 @@ void handle_client(int client_fd, struct sockaddr_in *addr)
         return;
     }
 
-    if (strncmp(buffer, "GET ", 4) == 0)
+    char method[8], path[256];
+    sscanf(buffer, "%s %s", method, path); // buffuer から method と path を取得
+
+    if (strcmp(method, "GET") == 0)
     {
-        html_response(client_fd, buffer); // 該当する HTML ファイルを返却する
+        html_response(client_fd, path); // 該当する HTML ファイルを返却する
     }
-    else if (strncmp(buffer, "POST ", 5) == 0)
+    else if (strcmp(method, "POST") == 0)
     {
         write(client_fd, created, strlen(created));
     }
-    else if (strncmp(buffer, "PUT ", 4) == 0)
+    else if (strcmp(method, "PUT ") == 0)
     {
         write(client_fd, ok, strlen(ok));
     }
-    else if (strncmp(buffer, "PATCH ", 6) == 0)
+    else if (strcmp(method, "PATCH ") == 0)
     {
         write(client_fd, ok, strlen(ok));
     }
-    else if (strncmp(buffer, "DELETE ", 7) == 0)
+    else if (strcmp(method, "DELETE ") == 0)
     {
         write(client_fd, no_content, strlen(no_content));
     }
